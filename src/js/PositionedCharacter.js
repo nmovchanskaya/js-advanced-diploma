@@ -22,9 +22,9 @@ export default class PositionedCharacter {
     const yNew = Math.floor(index / 8);
 
     if (
-      (x - xNew) === 0 && Math.abs(y - yNew) <= this.character.dist
-      || (y - yNew) === 0 && Math.abs(x - xNew) <= this.character.dist
-      || Math.abs(x - xNew) === Math.abs(y - yNew) && Math.abs(x - xNew) <= this.character.dist
+      ((x - xNew) === 0 && Math.abs(y - yNew) <= this.character.dist)
+      || ((y - yNew) === 0 && Math.abs(x - xNew) <= this.character.dist)
+      || (Math.abs(x - xNew) === Math.abs(y - yNew) && Math.abs(x - xNew) <= this.character.dist)
     ) {
       return true;
     }

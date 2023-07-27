@@ -1,3 +1,7 @@
+/**
+ * @jest-environment jsdom
+ */
+
 import { calcTileType } from '../js/utils';
 import Bowman from '../js/characters/Bowman';
 import Swordsman from '../js/characters/Swordsman';
@@ -6,9 +10,11 @@ import Daemon from '../js/characters/Daemon';
 import Undead from '../js/characters/Undead';
 import Vampire from '../js/characters/Vampire';
 import { characterGenerator, generateTeam } from '../js/generators';
-import Character, { getTooltipStr } from '../js/Character';
+import Character from '../js/Character';
 import PositionedCharacter from '../js/PositionedCharacter';
-import GameStateService, { load } from '../js/GameStateService';
+import GameStateService from '../js/GameStateService';
+import GamePlay from '../js/GamePlay';
+import GameController from '../js/GameController';
 
 // tests of cell types
 test('top-left', () => {
@@ -139,7 +145,6 @@ const playerTypes = [Bowman, Swordsman, Magician];
 const maxLevel = 3;
 const charCount = 5;
 const team = generateTeam(playerTypes, maxLevel, charCount);
-console.log(team);
 test.each(team.characters)(
   ('generateTeam level'),
   (character) => {
@@ -195,4 +200,20 @@ test('error in load game state', () => {
   gameStateService.load.mockReturnValue(new Error('Invalid state'));
   const obj = gameStateService.load();
   expect(obj).toBeInstanceOf(Error);
+});
+
+const gamePlay = new GamePlay();
+jest.mock('../js/GamePlay.js');
+test('enemyMove', () => {
+  const gameCtrl = new GameController(gamePlay);
+  gamePlay.redrawPositions.mockReturnValue(true);
+  gamePlay.boardSize = 8;
+
+  gameCtrl.positionedCharacters = [];
+  gameCtrl.positionedCharacters.push(new PositionedCharacter(new Bowman(1), 16));
+  gameCtrl.positionedCharacters.push(new PositionedCharacter(new Swordsman(1), 33));
+  gameCtrl.positionedCharacters.push(new PositionedCharacter(new Vampire(1), 55));
+
+  gameCtrl.enemyMove();
+  expect(gameCtrl.positionedCharacters[2].position).toBe(53);
 });

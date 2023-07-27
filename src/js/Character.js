@@ -14,15 +14,16 @@
  */
 export default class Character {
   constructor(level, type = 'generic') {
-    this.level = level;
-    this.attack = 0;
-    this.defence = 0;
-    this.health = 50;
-    this.type = type;
-
     try {
       if (new.target.name === 'Character') throw new Error('Character can`t be called with new');
+
+      this.level = level;
+      this.attack = 0;
+      this.defence = 0;
+      this.health = 50;
+      this.type = type;
     } catch (e) {
+      alert(e);
       return e;
     }
   }
@@ -30,8 +31,8 @@ export default class Character {
   levelUp() {
     this.level++;
 
-    this.attack = Math.max(this.attack, this.attack * (80 + this.health) / 100);
-    this.defence = Math.max(this.defence, this.defence * (80 + this.health) / 100);
+    this.attack = Math.max(this.attack, this.attack * ((80 + this.health) / 100));
+    this.defence = Math.max(this.defence, this.defence * ((80 + this.health) / 100));
 
     this.health += 80;
     if (this.health >= 100) {

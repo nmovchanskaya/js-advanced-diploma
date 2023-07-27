@@ -22,14 +22,23 @@ export default class GameController {
   }
 
   init() {
-    //draw the field
-    const themeName = themes.find((item) => item.level === 1).name;
+    // draw the field
+    let themeName = themes.find((item) => item.level === 1).name;
     this.gamePlay.drawUi(themeName);
 
-    //load or create new teams
+    // load or create new teams
     const loaded = this.loadGameState();
-    if (!loaded) {
-      //create new teams
+
+    // if loaded and it's computer's turn - call enemyMove
+    if (loaded) {
+      themeName = themes.find((item) => item.level === this.gameState.level).name;
+      this.gamePlay.drawUi(themeName);
+
+      if (this.gameState.nextStep === 'comp') {
+        this.enemyMove();
+      }
+    } else {
+      // create new teams
       this.positionedCharacters = [];
       this.gameState = new GameState();
 
@@ -42,7 +51,8 @@ export default class GameController {
       this.locateCharacters(teamEnemy, 'enemy');
     }
 
-    this.redrawAndUpdateSetOfCharacters();
+    // clear old lestenres and add new ones
+    this.clearListeners();
 
     this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
     this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
@@ -51,6 +61,8 @@ export default class GameController {
     this.gamePlay.addNewGameListener(this.onNewGameClick.bind(this));
     this.gamePlay.addSaveGameListener(this.onSaveGameClick.bind(this));
     this.gamePlay.addLoadGameListener(this.onLoadGameClick.bind(this));
+
+    this.redrawAndUpdateSetOfCharacters();
   }
 
   // load GameState from localStorage
@@ -60,8 +72,7 @@ export default class GameController {
     let obj;
     try {
       obj = gameStateService.load();
-    }
-    catch(e) {
+    } catch (e) {
       alert(e);
     }
 
@@ -73,7 +84,7 @@ export default class GameController {
       // load teams from localStorage
       this.positionedCharacters = [];
       obj.positionedCharacters.forEach((item) => {
-        let char = this.createCharacterCopy(item.character);
+        const char = GameController.createCharacterCopy(item.character);
         const posChar = new PositionedCharacter(char, item.position);
         this.positionedCharacters.push(posChar);
       });
@@ -84,7 +95,7 @@ export default class GameController {
       });
 
       if (obj.activeCharacter) {
-        let char = this.createCharacterCopy(obj.activeCharacter.character);
+        const char = GameController.createCharacterCopy(obj.activeCharacter.character);
         this.gameState.activeCharacter = new PositionedCharacter(char, obj.activeCharacter.position);
         this.activateNewCharacter(this.gameState.activeCharacter.position);
       }
@@ -94,7 +105,7 @@ export default class GameController {
   }
 
   // create character copy with input character
-  createCharacterCopy(character) {
+  static createCharacterCopy(character) {
     let char;
     switch (character.type) {
       case 'bowman':
@@ -116,13 +127,15 @@ export default class GameController {
         char = new Vampire(character.level);
         break;
     }
-    for (let prop in character) {
+    for (const prop in character) {
       char[prop] = character[prop];
     }
     return char;
   }
 
   // locate characters in the field
+  // team - characters to be located
+  // user - turn of user or computer
   locateCharacters(team, user) {
     let initialStatesCpy;
     if (user === 'user') {
@@ -130,11 +143,18 @@ export default class GameController {
     } else {
       initialStatesCpy = Array.from(initialStatesEnemy);
     }
-    // const positionedCharacters = [];
     team.characters.forEach((item) => {
-      const randomIdx = Math.floor(Math.random() * initialStatesCpy.length);
-      this.positionedCharacters.push(new PositionedCharacter(item, initialStatesCpy[randomIdx]));
-      initialStatesCpy.splice(randomIdx, 1);
+      while (true) {
+        const randomIdx = Math.floor(Math.random() * initialStatesCpy.length);
+
+        // check there is no characters in this cell
+        const charIdx = this.positionedCharacters.findIndex((elem) => elem.position === initialStatesCpy[randomIdx]);
+        if (charIdx === -1) {
+          this.positionedCharacters.push(new PositionedCharacter(item, initialStatesCpy[randomIdx]));
+          initialStatesCpy.splice(randomIdx, 1);
+          break;
+        }
+      }
     });
   }
 
@@ -147,24 +167,30 @@ export default class GameController {
     return this.positionedCharacters.filter((item) => ['undead', 'daemon', 'vampire'].includes(item.character.type));
   }
 
-  //find by index positionedCharacter and cell
-  //deselect previously active cell
-  //select new active cell
-  //update gameState.activeCharacter
+  // find by index positionedCharacter and cell
+  // deselect previously active cell
+  // select new active cell
+  // update gameState.activeCharacter
   activateNewCharacter(index) {
     const character = this.positionedCharacters.find((item) => item.position === index);
+
+    // find previously selected character
     const selectedIndex = this.gamePlay.cells.findIndex((item) => item.classList.contains('selected-yellow'));
     if (selectedIndex >= 0) {
       this.gamePlay.deselectCell(selectedIndex);
     }
+
+    // select new active cell and update gameState.activeCharacter
     this.gamePlay.selectCell(index);
     this.gameState.activeCharacter = character;
   }
 
+  // deselect cell
+  // if it was activeCharacter - set to null
   deactivateCharacter(index) {
     this.gamePlay.deselectCell(index);
 
-    //if it was activeCharacter - set to null
+    // if it was activeCharacter - set to null
     if (index === this.gameState.activeCharacter.position) {
       this.gameState.activeCharacter = null;
     }
@@ -185,8 +211,10 @@ export default class GameController {
               // attack enemy
               const attacker = this.gameState.activeCharacter.character;
               const target = this.positionedCharacters.find((item) => item.position === index).character;
-              await this.attack(attacker, target, index, true);
-              this.enemyMove();
+              const attackResponse = await this.attack(attacker, target, index, true);
+              if (attackResponse === 'ok') {
+                this.enemyMove();
+              }
             } else {
               GamePlay.showError('You can\'t attack so far from your position');
             }
@@ -198,7 +226,7 @@ export default class GameController {
 
           // move active Character to another cell
           this.gameState.activeCharacter.move(index);
-          console.log(this.positionedCharacters);
+          this.gameState.nextStep = 'comp';
           this.redrawAndUpdateSetOfCharacters();
           this.enemyMove();
         }
@@ -219,7 +247,7 @@ export default class GameController {
     }
   }
 
-  // вызывается из GamaPlay с параметром index
+  // вызывается из GamePlay с параметром index
   onCellEnter(index) {
     if (this.gamePlay.cells[index].children.length !== 0) {
       if (this.gamePlay.cells[index].children[0].classList.contains('character')) {
@@ -253,6 +281,9 @@ export default class GameController {
     }
   }
 
+  // change cursor and selected cell, previously checked if cell is in moving/attack area of activeCharacter
+  // index of cell
+  // action = "move"/"attack"
   changeCursorSelection(index, action) {
     let color;
     let cursor;
@@ -262,8 +293,7 @@ export default class GameController {
       color = 'green';
       cursor = 'pointer';
       haveToChange = this.gameState.activeCharacter.inMovingArea(index);
-    }
-    else if (action === 'attack') {
+    } else if (action === 'attack') {
       color = 'red';
       cursor = 'crosshair';
       haveToChange = this.gameState.activeCharacter.inAttackArea(index);
@@ -280,6 +310,8 @@ export default class GameController {
   onCellLeave(index) {
     this.gamePlay.setCursor('auto');
     this.gamePlay.hideCellTooltip(index);
+
+    // deselect green or red cell
     const selectedGrnIndex = this.gamePlay.cells.findIndex((item) => item.classList.contains('selected-green'));
     if (selectedGrnIndex >= 0) {
       this.gamePlay.deselectCell(selectedGrnIndex);
@@ -307,7 +339,7 @@ export default class GameController {
     gameStateService.save(this.gameState);
   }
 
-  // function on click Save game
+  // function on click Load game
   onLoadGameClick() {
     this.loadGameState();
   }
@@ -323,41 +355,45 @@ export default class GameController {
   }
 
   // attack target with attacker character, index - position of target, user - is user action or not
-  // return true if game is not over
+  // return 'level' for Level up,
+  // 'over if Game is over,
+  // 'next' if it's enemy's turn
+  // 'ok' for regular next step
   async attack(attacker, target, index, user = false) {
     if (user) {
       this.gameState.nextStep = 'comp';
-    }
-    else {
+    } else {
       this.gameState.nextStep = 'user';
     }
 
     const damage = Math.max(attacker.attack - target.defence, attacker.attack * 0.1);
-    await this.gamePlay.showDamage(index, damage);
+    await this.gamePlay.showDamage(index, damage.toFixed(1));
     target.health -= damage;
 
     // delete character if health <= 0
     if (target.health <= 0) {
       this.positionedCharacters = this.positionedCharacters.filter((item) => item.character.health > 0);
-      
+
       this.deactivateCharacter(index);
-      
+
       // check if there are no enemies
       // so we need to level up or end the game
       if (this.checkNoEnemies(user)) {
         if (user && this.gameState.level < 4) {
           this.levelUp();
-          return true;
+          return 'level';
         }
 
         this.gameOver();
-        return false;
+        return 'over';
       }
     }
     this.redrawAndUpdateSetOfCharacters();
+    return 'ok';
   }
 
   // check, if there are no enemies in another team
+  // user - true if user, false if computer
   checkNoEnemies(user) {
     let otherTeam;
     if (user) {
@@ -393,7 +429,9 @@ export default class GameController {
     const teamEnemy = generateTeam(playerTypes2, 1, 2);
     this.locateCharacters(teamEnemy, 'enemy');
 
-    console.log(this.positionedCharacters);
+    // set nextStep
+    this.gameState.nextStep = 'user';
+
     this.redrawAndUpdateSetOfCharacters();
   }
 
@@ -431,44 +469,46 @@ export default class GameController {
 
     // if in attackarea - attack
     if (randCharacter.inAttackArea(attackedCharacter.position)) {
-      await this.attack(randCharacter.character, attackedCharacter.character, attackedCharacter.position);
+      const attackResponse = await this.attack(randCharacter.character, attackedCharacter.character, attackedCharacter.position);
     } else {
       // else move:
       // go to max possible distance in X or Y
-      let maxDistanse;
-      if (Math.abs(minDeltaX) >= Math.abs(minDeltaY)) {
-        maxDistanse = Math.min(Math.abs(minDeltaX) - 1, randCharacter.character.distAttack);
-        let newX;
-        if (minDeltaX > 0) {
-          newX = xChar + maxDistanse;
+      while (true) {
+        let maxDistanse;
+        if (Math.abs(minDeltaX) >= Math.abs(minDeltaY)) {
+          maxDistanse = Math.min(Math.abs(minDeltaX) - 1, randCharacter.character.distAttack);
+          let newX;
+          if (minDeltaX > 0) {
+            newX = xChar + maxDistanse;
+          } else {
+            newX = xChar - maxDistanse;
+          }
+          newPosition = yChar * this.gamePlay.boardSize + newX;
         } else {
-          newX = xChar - maxDistanse;
+          maxDistanse = Math.min(Math.abs(minDeltaY) - 1, randCharacter.character.distAttack);
+          let newY;
+          if (minDeltaY > 0) {
+            newY = yChar + maxDistanse;
+          } else {
+            newY = yChar - maxDistanse;
+          }
+          newPosition = newY * this.gamePlay.boardSize + xChar;
         }
-        newPosition = yChar * this.gamePlay.boardSize + newX;
-      } else {
-        maxDistanse = Math.min(Math.abs(minDeltaY), randCharacter.character.distAttack);
-        let newY;
-        if (minDeltaY > 0) {
-          newY = yChar + maxDistanse;
-        } else {
-          newY = yChar - maxDistanse;
+        // check there is no characters in this cell
+        const charIdx = this.positionedCharacters.findIndex((item) => item.position === newPosition);
+        if (charIdx === -1) {
+          randCharacter.move(newPosition);
+          this.gameState.nextStep = 'user';
+          this.redrawAndUpdateSetOfCharacters();
+          break;
         }
-        newPosition = newY * this.gamePlay.boardSize + xChar;
-      }
-      // check there is no characters in this cell
-      const charIdx = this.positionedCharacters.findIndex((item) => item.position === newPosition);
-      if (charIdx === -1) {
-        randCharacter.move(newPosition);
-        this.redrawAndUpdateSetOfCharacters();
       }
     }
   }
 
   gameOver() {
-    //block all movements ot the field
-    this.gamePlay.cellClickListeners = [];
-    this.gamePlay.cellEnterListeners = [];
-    this.gamePlay.cellLeaveListeners = [];
+    // block all movements ot the field
+    this.clearFieldListeners();
     this.gamePlay.redrawPositions(this.positionedCharacters);
 
     alert('Game over!');
@@ -476,10 +516,29 @@ export default class GameController {
     this.onNewGameClick();
   }
 
+  //
+  clearFieldListeners() {
+    this.gamePlay.cellClickListeners = [];
+    this.gamePlay.cellEnterListeners = [];
+    this.gamePlay.cellLeaveListeners = [];
+  }
+
+  clearListeners() {
+    this.gamePlay.cellClickListeners = [];
+    this.gamePlay.cellEnterListeners = [];
+    this.gamePlay.cellLeaveListeners = [];
+    this.gamePlay.newGameListeners = [];
+    this.gamePlay.saveGameListeners = [];
+    this.gamePlay.loadGameListeners = [];
+  }
+
   // update positionedCharacters in gameState
   // and save current state in localStorage
   redrawAndUpdateSetOfCharacters() {
     this.gamePlay.redrawPositions(this.positionedCharacters);
+    if (this.gameState.activeCharacter) {
+      this.activateNewCharacter(this.gameState.activeCharacter.position);
+    }
 
     // update positionedCharacters in gameState
     this.gameState.positionedCharacters = [];

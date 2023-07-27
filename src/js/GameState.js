@@ -15,9 +15,4 @@ export default class GameState {
       this.maxPoints = points;
     }
   }
-
-  static from(object) {
-    this.nextStep = object.nextStep;
-    return this;
-  }
 }
