@@ -21,7 +21,7 @@ export default class GameController {
     this.positionedCharacters = [];
   }
 
-  init() {
+  async init() {
     // draw the field
     let themeName = themes.find((item) => item.level === 1).name;
     this.gamePlay.drawUi(themeName);
@@ -35,7 +35,7 @@ export default class GameController {
       this.gamePlay.drawUi(themeName);
 
       if (this.gameState.nextStep === 'comp') {
-        this.enemyMove();
+        await this.enemyMove();
       }
     } else {
       // create new teams
@@ -212,9 +212,9 @@ export default class GameController {
               const attacker = this.gameState.activeCharacter.character;
               const target = this.positionedCharacters.find((item) => item.position === index).character;
               const attackResponse = await this.attack(attacker, target, index, true);
-              if (attackResponse === 'ok') {
+              /* if (attackResponse === 'ok') {
                 this.enemyMove();
-              }
+              } */
             } else {
               GamePlay.showError('You can\'t attack so far from your position');
             }
@@ -228,7 +228,7 @@ export default class GameController {
           this.gameState.activeCharacter.move(index);
           this.gameState.nextStep = 'comp';
           this.redrawAndUpdateSetOfCharacters();
-          this.enemyMove();
+          await this.enemyMove();
         }
       } else if (this.gamePlay.cells[index].children.length !== 0) {
         // set active character for the first time
@@ -244,6 +244,9 @@ export default class GameController {
       } else {
         GamePlay.showError('You can select only cells with your characters');
       }
+    } else {
+      await this.enemyMove();
+      // alert('Hey!');
     }
   }
 
@@ -389,6 +392,11 @@ export default class GameController {
       }
     }
     this.redrawAndUpdateSetOfCharacters();
+
+    // when it was user action call for computer movement
+    if (user) {
+      await this.enemyMove();
+    }
     return 'ok';
   }
 
