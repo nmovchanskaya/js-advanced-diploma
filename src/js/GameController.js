@@ -53,10 +53,7 @@ export default class GameController {
 
     // clear old lestenres and add new ones
     this.clearListeners();
-
-    this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
-    this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
-    this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
+    this.setFieldListeners();
 
     this.gamePlay.addNewGameListener(this.onNewGameClick.bind(this));
     this.gamePlay.addSaveGameListener(this.onSaveGameClick.bind(this));
@@ -244,9 +241,6 @@ export default class GameController {
       } else {
         GamePlay.showError('You can select only cells with your characters');
       }
-    } else {
-      await this.enemyMove();
-      // alert('Hey!');
     }
   }
 
@@ -363,6 +357,8 @@ export default class GameController {
   // 'next' if it's enemy's turn
   // 'ok' for regular next step
   async attack(attacker, target, index, user = false) {
+    this.clearFieldListeners();
+
     if (user) {
       this.gameState.nextStep = 'comp';
     } else {
@@ -384,6 +380,7 @@ export default class GameController {
       if (this.checkNoEnemies(user)) {
         if (user && this.gameState.level < 4) {
           this.levelUp();
+          this.setFieldListeners();
           return 'level';
         }
 
@@ -393,10 +390,11 @@ export default class GameController {
     }
     this.redrawAndUpdateSetOfCharacters();
 
-    // when it was user action call for computer movement
+    // when it was user action - call for computer movement
     if (user) {
       await this.enemyMove();
     }
+    this.setFieldListeners();
     return 'ok';
   }
 
@@ -524,7 +522,6 @@ export default class GameController {
     this.onNewGameClick();
   }
 
-  //
   clearFieldListeners() {
     this.gamePlay.cellClickListeners = [];
     this.gamePlay.cellEnterListeners = [];
@@ -538,6 +535,15 @@ export default class GameController {
     this.gamePlay.newGameListeners = [];
     this.gamePlay.saveGameListeners = [];
     this.gamePlay.loadGameListeners = [];
+  }
+
+  setFieldListeners() {
+    // if there are no field listeners - set them
+    if (this.gamePlay.cellClickListeners.length === 0) {
+      this.gamePlay.addCellEnterListener(this.onCellEnter.bind(this));
+      this.gamePlay.addCellLeaveListener(this.onCellLeave.bind(this));
+      this.gamePlay.addCellClickListener(this.onCellClick.bind(this));
+    }
   }
 
   // update positionedCharacters in gameState
