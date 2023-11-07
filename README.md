@@ -108,4 +108,4 @@ After moving to a new level, we change the theme of the game
 
 After the end of the game (the player loses) or the completion of all 4 levels, the playing field is blocked (i.e. not react to events occurring on it).
 
-When you click on the `New Game` button, a new game starts, but the maximum number of points scored for previous games is saved in `GameState'.
+When you click on the `New Game` button, a new game starts, but the maximum number of points scored for previous games is saved in 'GameState'.
